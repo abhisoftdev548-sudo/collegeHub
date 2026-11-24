@@ -92,8 +92,18 @@ export const getStudentById = async (id: string) => {
   return profile;
 };
 
+/**
+ * Enrollment history is keyed by the student's *user* id, while routes accept
+ * either the StudentProfile id or the user id (both are surfaced to clients).
+ * Resolve whichever id was supplied before querying.
+ */
 export const getStudentHistory = async (studentId: string) => {
-  return StudentEnrollment.find({ student: studentId })
+  const profile = await StudentProfile.findOne({ $or: [{ _id: studentId }, { user: studentId }] })
+    .select('user')
+    .lean();
+  const userId = profile?.user ? String(profile.user) : studentId;
+
+  return StudentEnrollment.find({ student: userId })
     .populate('academicSession', 'name')
     .populate('course', 'name code')
     .populate('semester', 'number label')

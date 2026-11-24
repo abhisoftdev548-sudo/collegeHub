@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/providers/auth-provider';
 import { api } from '@/lib/api';
 import { initials, titleCase } from '@/lib/utils';
+import { GlobalSearch } from './global-search';
 
 const labelForSegment = (segment: string): string =>
   titleCase(decodeURIComponent(segment).replace(/\.(html?|tsx?)$/, ''));
@@ -55,6 +56,7 @@ export const Topbar = ({ onMenuClick }: { onMenuClick: () => void }) => {
       </nav>
 
       <div className="ml-auto flex items-center gap-1.5">
+        <GlobalSearch />
         {isCR ? (
           <Badge variant="primary" className="hidden sm:inline-flex">
             Class Representative

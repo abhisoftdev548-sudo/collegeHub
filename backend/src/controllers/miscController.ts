@@ -5,11 +5,12 @@ import * as dashboardService from '../services/dashboardService';
 import * as reportService from '../services/reportService';
 import * as notificationService from '../services/notificationService';
 import * as settingsService from '../services/settingsService';
-import { Settings, AuditLog, User } from '../models';
+import { Settings, AuditLog, Event, StudentProfile, User } from '../models';
 import { created, ok, paginated, param } from '../utils/apiResponse';
 import { recordAudit } from '../utils/audit';
 import { ForbiddenError, UnauthorizedError } from '../utils/errors';
 import { ANNOUNCEMENT_AUDIENCES } from '../config/constants';
+import { getTeacherScope } from '../services/accessControl';
 
 /* ------------------------------- Announcements ------------------------------ */
 
@@ -168,13 +169,102 @@ export const updateSettings = async (req: Request, res: Response) => {
 
 /* ----------------------------------- Search --------------------------------- */
 
+/**
+ * Cross-entity quick search used by the dashboard topbar.
+ *
+ * Results respect data scope: students/teachers are only searched for users who
+ * may read them, and teachers only match inside their own sections and events.
+ */
 export const globalSearch = async (req: Request, res: Response) => {
   if (!req.user) throw new UnauthorizedError();
-  if (!['admin', 'teacher'].includes(req.user.role)) return ok(res, { students: [], events: [] });
+
   const term = String(req.query.q ?? '').trim();
-  if (term.length < 2) return ok(res, { students: [], events: [] });
+  if (term.length < 2) {
+    return ok(res, { term, students: [], teachers: [], events: [], competitions: [], announcements: [] });
+  }
+
   const regex = new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
-  return ok(res, { students: [], events: [], term, users: await User.find({ name: regex }).select('name email role').limit(5).lean() });
+  const actor = req.user;
+  const canReadStudents = actor.role === 'admin' || actor.role === 'teacher';
+  const canReadTeachers = actor.role === 'admin';
+
+  const scope = actor.role === 'teacher' ? await getTeacherScope(actor) : null;
+
+  const [students, teachers, events, competitions, announcements] = await Promise.all([
+    canReadStudents
+      ? (async () => {
+          const userFilter: Record<string, unknown> = { role: 'student', $or: [{ name: regex }, { email: regex }] };
+          const profiles = await StudentProfile.find({
+            $or: [{ enrollmentNumber: regex }, { rollNumber: regex }],
+            ...(scope && !scope.isAdmin ? { section: { $in: scope.sectionIds } } : {}),
+          })
+            .populate('user', 'name email')
+            .select('user enrollmentNumber section')
+            .limit(5)
+            .lean();
+
+          const users = await User.find(userFilter).select('_id').limit(5).lean();
+          const byUser = users.length
+            ? await StudentProfile.find({
+                user: { $in: users.map((user) => user._id) },
+                ...(scope && !scope.isAdmin ? { section: { $in: scope.sectionIds } } : {}),
+              })
+                .populate('user', 'name email')
+                .select('user enrollmentNumber section')
+                .limit(5)
+                .lean()
+            : [];
+
+          const seen = new Set<string>();
+          return [...profiles, ...byUser]
+            .filter((profile) => {
+              const key = String(profile._id);
+              if (seen.has(key)) return false;
+              seen.add(key);
+              return true;
+            })
+            .slice(0, 5)
+            .map((profile) => ({
+              _id: profile._id,
+              name: (profile.user as unknown as { name?: string })?.name ?? '',
+              email: (profile.user as unknown as { email?: string })?.email ?? '',
+              enrollmentNumber: profile.enrollmentNumber,
+            }));
+        })()
+      : Promise.resolve([]),
+    canReadTeachers
+      ? User.find({ role: 'teacher', $or: [{ name: regex }, { email: regex }, { designation: regex }] })
+          .select('name email designation')
+          .limit(5)
+          .lean()
+      : Promise.resolve([]),
+    Event.find({
+      $or: [{ title: regex }, { slug: regex }, { venue: regex }],
+      ...(scope && !scope.isAdmin && scope.eventIds.length ? { _id: { $in: scope.eventIds } } : {}),
+      ...(actor.role === 'student' ? { isPublic: true } : {}),
+    })
+      .select('title slug startDate status venue')
+      .limit(5)
+      .lean(),
+    actor.role === 'student'
+      ? Promise.resolve([])
+      : (await import('../models')).Competition.find({ $or: [{ title: regex }, { category: regex }] })
+          .select('title category status event')
+          .limit(5)
+          .lean(),
+    // Only announcements the user can actually see, matched on title/body.
+    announcementService
+      .listAnnouncementsForUser(actor, 100)
+      .then(({ items }) =>
+        items
+          .filter((item) => regex.test(item.title) || regex.test(item.body))
+          .slice(0, 5)
+          .map((item) => ({ _id: item._id, title: item.title, audience: item.audience, priority: item.priority })),
+      )
+      .catch(() => []),
+  ]);
+
+  return ok(res, { term, students, teachers, events, competitions, announcements });
 };
 
 export { z, ForbiddenError };

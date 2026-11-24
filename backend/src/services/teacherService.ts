@@ -21,9 +21,11 @@ export const listTeachers = async (params: ListTeacherParams) => {
   }
   if (params.status) filter.status = params.status;
   if (params.department) {
-    filter._id = {
-      $in: (await Department.find({ _id: params.department }).select('_id').lean()).map((d) => d._id),
-    };
+    // Teachers belong to a department when they are listed in it or head it.
+    const department = await Department.findById(params.department).select('teachers head').lean();
+    const memberIds = [...(department?.teachers ?? [])];
+    if (department?.head) memberIds.push(department.head);
+    filter._id = { $in: memberIds };
   }
 
   const [items, total] = await Promise.all([
