@@ -1,0 +1,53 @@
+{
+  "name": "collegehub-backend",
+  "version": "1.0.0",
+  "private": true,
+  "description": "CollegeHub API server (Express + TypeScript + MongoDB)",
+  "main": "dist/server.js",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "tsx watch --clear-screen=false src/server.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/server.js",
+    "bootstrap:admin": "tsx src/scripts/bootstrapAdmin.ts",
+    "bootstrap:admin:prod": "node dist/scripts/bootstrapAdmin.js",
+    "seed:demo": "tsx src/scripts/seedDemo.ts",
+    "seed:demo:prod": "node dist/scripts/seedDemo.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "publish:scheduled": "tsx src/scripts/publishScheduledAnnouncements.ts",
+    "publish:scheduled:prod": "node dist/scripts/publishScheduledAnnouncements.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "compression": "^1.8.2",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.5",
+    "csv-parse": "^7.0.3",
+    "csv-stringify": "^6.9.0",
+    "dotenv": "^17.2.3",
+    "express": "^4.21.2",
+    "express-rate-limit": "^8.7.5",
+    "helmet": "^8.3.0",
+    "jsonwebtoken": "^9.0.3",
+    "mongoose": "^8.24.11",
+    "multer": "^2.5.0",
+    "pino": "^10.4.0",
+    "pino-http": "^11.0.0",
+    "qrcode": "^1.5.4",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/compression": "^1.8.1",
+    "@types/cookie-parser": "^1.4.10",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/multer": "^2.3.0",
+    "@types/node": "^22.18.12",
+    "@types/qrcode": "^1.5.6",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3"
+  }
+}
