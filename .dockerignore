@@ -2,7 +2,7 @@
 **/.next
 **/out
 **/dist
-**/public
+/backend/public
 **/uploads/*
 !**/uploads/.gitkeep
 **/.env
