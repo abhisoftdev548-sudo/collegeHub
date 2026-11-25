@@ -39,7 +39,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   useEffect(() => {
-    void primeCsrf();
     void loadUser();
   }, [loadUser]);
 

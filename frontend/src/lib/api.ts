@@ -63,8 +63,11 @@ export const primeCsrf = async (): Promise<void> => {
   if (!csrfPrimed) {
     csrfPrimed = http
       .get('/auth/csrf')
-      .then(() => undefined)
-      .catch(() => undefined)
+      .then(() => {
+        if (!readCookie(CSRF_COOKIE)) {
+          throw new Error('Unable to initialize security token. Check your connection and try again.');
+        }
+      })
       .finally(() => {
         csrfPrimed = null;
       });
@@ -74,7 +77,7 @@ export const primeCsrf = async (): Promise<void> => {
 
 http.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
   const method = (config.method ?? 'get').toUpperCase();
-  if (!['GET', 'HEAD', 'OPTIONS'].includes(method) && !config.url?.startsWith('/auth/login')) {
+  if (!['GET', 'HEAD', 'OPTIONS'].includes(method)) {
     await primeCsrf();
     const token = readCookie(CSRF_COOKIE);
     if (token) config.headers.set(CSRF_HEADER, token);
